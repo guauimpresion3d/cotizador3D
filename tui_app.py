@@ -190,8 +190,8 @@ class CotizacionScreen(Screen):
                     yield Label("¿Cama Llena?")
                     yield Switch(id="sw_cama")
                 with Vertical():
-                    yield Label("¿Pieza Única?")
-                    yield Switch(id="sw_unica")
+                    yield Label("¿Figuras a Armar? (Opcional)")
+                    yield Input(placeholder="Auto", id="input_ensambladas")
 
             # --- Formulario de Bandeja ---
             yield Label("Nombre del Proyecto/Bandeja:")
@@ -321,7 +321,11 @@ class CotizacionScreen(Screen):
             es_nuevo = self.query_one("#sw_nuevo", Switch).value
             es_urgente = self.query_one("#sw_urgencia", Switch).value
             es_cama = self.query_one("#sw_cama", Switch).value
-            es_unica = self.query_one("#sw_unica", Switch).value
+            
+            ensambladas_str = self.query_one("#input_ensambladas", Input).value
+            figuras_ensambladas = None
+            if ensambladas_str and ensambladas_str.isdigit():
+                figuras_ensambladas = int(ensambladas_str)
 
             cotizador = Cotizador3D()
             resultados = cotizador.calcular_proyecto(
@@ -329,14 +333,14 @@ class CotizacionScreen(Screen):
                 es_nuevo=es_nuevo, 
                 operacion_24h=es_urgente,
                 es_cama_llena=es_cama,
-                es_pieza_unica=es_unica
+                figuras_ensambladas=figuras_ensambladas
             )
             
             context_data = {
                 "es_nuevo": es_nuevo,
                 "operacion_24h": es_urgente,
                 "es_cama_llena": es_cama,
-                "es_pieza_unica": es_unica,
+                "figuras_ensambladas": figuras_ensambladas,
                 "bandejas_input": bandejas_a_calcular
             }
             
@@ -374,6 +378,9 @@ class ReporteScreen(Screen):
             yield Label("\n>>> ESCENARIOS SOCIO COMERCIAL <<<")
             yield DataTable(id="table_socios")
 
+            yield Label("\n>>> DESGLOSE DE CALCULOS (Auditoría) <<<")
+            yield DataTable(id="table_audit")
+
             with Horizontal(classes="buttons_container"):
                 yield Button("<< REGRESAR", id="btn_back", variant="warning")
                 yield Button("GUARDAR EN BD", id="btn_save", variant="success")
@@ -397,6 +404,9 @@ class ReporteScreen(Screen):
         ts = self.query_one("#table_socios", DataTable)
         ts.add_columns("NIVEL", "UTILIDAD %", "PVP CLIENTE", "TU PAGO (NETO)", "TU UTILIDAD", "PAGO LOCAL", "UTIL. SOCIO")
         
+        ta = self.query_one("#table_audit", DataTable)
+        ta.add_columns("BANDEJA", "CONCEPTO", "FÓRMULA / DESGLOSE")
+
         self._cargar_datos()
 
     def _cargar_datos(self):
@@ -457,6 +467,17 @@ class ReporteScreen(Screen):
                 f"${s['Utilidad_Socio']:.2f}"
             )
 
+        # 6. Auditoría (Fórmulas)
+        ta = self.query_one("#table_audit", DataTable)
+        ta.clear()
+        for item in res.get("auditoria", []):
+            nombre = item["nombre"]
+            d = item["detalles"]
+            ta.add_row(nombre, "Tiempo Efec.", d["formula_tiempo"])
+            ta.add_row(nombre, "Energía", d["formula_energia"])
+            ta.add_row(nombre, "Desgaste", d["formula_desgaste"])
+            ta.add_row(nombre, "Material", d["formula_material"])
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn_back":
             self.app.pop_screen()
@@ -477,7 +498,7 @@ class ReporteScreen(Screen):
                         es_nuevo=self.context_data["es_nuevo"],
                         operacion_24h=self.context_data["operacion_24h"],
                         es_cama_llena=self.context_data["es_cama_llena"],
-                        es_pieza_unica=self.context_data["es_pieza_unica"],
+                        figuras_ensambladas=self.context_data["figuras_ensambladas"],
                         bandejas_input=self.context_data["bandejas_input"]
                     )
                     self.app.notify("Cotización guardada exitosamente en BD", title="ÉXITO")

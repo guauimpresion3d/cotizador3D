@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from core_logic import BandejaInput
 from db.models import ProyectoCotizacion, BandejaDetalle
 
-def guardar_cotizacion(db: Session, nombre_proyecto: str, resultados: dict, es_nuevo: bool, operacion_24h: bool, es_cama_llena: bool, es_pieza_unica: bool, bandejas_input: list[BandejaInput]):
+def guardar_cotizacion(db: Session, nombre_proyecto: str, resultados: dict, es_nuevo: bool, operacion_24h: bool, es_cama_llena: bool, figuras_ensambladas: int, bandejas_input: list[BandejaInput]):
     """
     Persiste una cotización y sus bandejas en la base de datos.
     """
@@ -20,7 +20,7 @@ def guardar_cotizacion(db: Session, nombre_proyecto: str, resultados: dict, es_n
         es_nuevo=es_nuevo,
         operacion_24h=operacion_24h,
         es_cama_llena=es_cama_llena,
-        es_pieza_unica=es_pieza_unica,
+        figuras_ensambladas_total=figuras_ensambladas,
         
         peso_total_g=fis["peso_total_g"],
         tiempo_real_h=fis["tiempo_real_h"],
@@ -49,11 +49,14 @@ def guardar_cotizacion(db: Session, nombre_proyecto: str, resultados: dict, es_n
     db.flush() # Para obtener el ID del proyecto sin hacer commit todavía
 
     # 3. Crear detalle (Bandejas)
+    auditoria = resultados.get("auditoria", [])
+    
     for index, bandeja_in in enumerate(bandejas_input):
-        # Intentamos obtener el resultado calculado específico si fuera necesario,
-        # pero BandejaInput ya tiene los inputs y el dict de resultados no lo devuelve por bandeja en este formato básico, 
-        # así que guardamos lo que tenemos o recalculamos lo básico si hiciera falta.
-        # Por simplicidad, guardamos los inputs.
+        # Buscar auditoría correspondiente
+        audit_det = {}
+        if index < len(auditoria):
+            audit_det = auditoria[index].get("detalles", {})
+
         detalle = BandejaDetalle(
             proyecto_id=proyecto.id,
             nombre=bandeja_in.nombre,
@@ -63,7 +66,13 @@ def guardar_cotizacion(db: Session, nombre_proyecto: str, resultados: dict, es_n
             peso_gramos=bandeja_in.peso_gramos,
             altura_capa=bandeja_in.altura_capa,
             boquilla=bandeja_in.boquilla,
-            piezas=bandeja_in.piezas
+            piezas=bandeja_in.piezas,
+            
+            # Auditoría
+            formula_tiempo=audit_det.get("formula_tiempo"),
+            formula_energia=audit_det.get("formula_energia"),
+            formula_desgaste=audit_det.get("formula_desgaste"),
+            formula_material=audit_det.get("formula_material")
         )
         db.add(detalle)
         

@@ -14,7 +14,7 @@ class ProyectoCotizacion(Base):
     es_nuevo = Column(Boolean, default=False)
     operacion_24h = Column(Boolean, default=False)
     es_cama_llena = Column(Boolean, default=False)
-    es_pieza_unica = Column(Boolean, default=False)
+    figuras_ensambladas_total = Column(Integer, nullable=True)
 
     # Resultados Físicos
     peso_total_g = Column(Float)
@@ -68,6 +68,12 @@ class BandejaDetalle(Base):
     factor_altura = Column(Float)
     factor_boquilla = Column(Float)
     es_material_tecnico = Column(Boolean)
+
+    # Auditoría: Fórmulas aplicadas
+    formula_tiempo = Column(String, nullable=True)
+    formula_energia = Column(String, nullable=True)
+    formula_desgaste = Column(String, nullable=True)
+    formula_material = Column(String, nullable=True)
 
     # Relacion
     proyecto = relationship("ProyectoCotizacion", back_populates="bandejas")

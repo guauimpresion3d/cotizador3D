@@ -126,10 +126,16 @@ class Cotizador3D:
             "costo_material": costo_material,
             "f_altura": f_alt,
             "f_boquilla": f_boq,
-            "es_tecnico": self.es_material_tecnico(bandeja.material)
+            "es_tecnico": self.es_material_tecnico(bandeja.material),
+            "audit": {
+                "formula_tiempo": f"{bandeja.tiempo_horas}h * {f_alt} (alt) * {f_boq} (boq)",
+                "formula_energia": f"{t_efectivo:.2f}h * {consumo_kw}kW * ${tarifa_energia:.2f}",
+                "formula_desgaste": f"{t_efectivo:.2f}h * (${DESGASTE_MAQUINA_HORA} * {f_alt} * {f_boq})",
+                "formula_material": f"{bandeja.peso_gramos}g * ${COSTO_MATERIAL_MXN_GR}"
+            }
         }
 
-    def calcular_proyecto(self, bandejas: List[BandejaInput], es_nuevo: bool = False, operacion_24h: bool = False, es_cama_llena: bool = False, es_pieza_unica: bool = False):
+    def calcular_proyecto(self, bandejas: List[BandejaInput], es_nuevo: bool = False, operacion_24h: bool = False, es_cama_llena: bool = False, figuras_ensambladas: int = None):
         """Calcula el proyecto completo aplicando reglas globales."""
         
         costo_material_total = 0.0
@@ -137,9 +143,14 @@ class Cotizador3D:
         costo_desgaste_total = 0.0
         tiempo_efectivo_total = 0.0
         tiempo_real_total = 0.0
-        piezas_total = 1 if es_pieza_unica else sum(b.piezas for b in bandejas)
+        
+        if figuras_ensambladas and figuras_ensambladas > 0:
+            piezas_total = figuras_ensambladas
+        else:
+            piezas_total = sum(b.piezas for b in bandejas)
         
         detalle_bandejas = []
+        audit_global = []
         
         for b in bandejas:
             res = self.calcular_costo_bandeja(b)
@@ -149,6 +160,13 @@ class Cotizador3D:
             tiempo_efectivo_total += res["tiempo_efectivo"]
             tiempo_real_total += b.tiempo_horas
             detalle_bandejas.append(res)
+            
+            # Audit por bandeja
+            audit_global.append({
+                "nombre": b.nombre,
+                "piezas": b.piezas,
+                "detalles": res["audit"]
+            })
             
         num_bandejas = len(bandejas)
         if num_bandejas >= 3:
@@ -237,5 +255,6 @@ class Cotizador3D:
                 "productivo": obj_productivo,
                 "cama_llena": obj_cama_llena,
                 "socio": escenarios_socio
+            },
+            "auditoria": audit_global
             }
-        }
